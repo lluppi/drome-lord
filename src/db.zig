@@ -107,8 +107,9 @@ pub const Song = struct {
     /// deep copy into `alloc` (queue entries must outlive library snapshots).
     pub fn clone(s: Song, alloc: Allocator) !Song {
         var o = s;
-        inline for (std.meta.fields(Song)) |f| {
-            if (f.type == []const u8) @field(o, f.name) = try alloc.dupe(u8, @field(s, f.name));
+        const info = @typeInfo(Song).@"struct";
+        inline for (info.field_names, info.field_types) |name, T| {
+            if (T == []const u8) @field(o, name) = try alloc.dupe(u8, @field(s, name));
         }
         const g = try alloc.alloc([]const u8, s.genres.len);
         for (s.genres, g) |src, *dst| dst.* = try alloc.dupe(u8, src);
@@ -443,20 +444,23 @@ pub const Store = struct {
 
     pub fn setSynced(st: *Store, now: i64) !void {
         var buf: [64]u8 = undefined;
-        const q = try std.fmt.bufPrintZ(&buf, "REPLACE INTO meta VALUES('synced','{d}')", .{now});
+        const q = try std.fmt.bufPrintSentinel(&buf, "REPLACE INTO meta VALUES('synced','{d}')", .{now}, 0);
         try st.exec(q.ptr);
     }
 };
 
-pub const SyncResult = struct { lib: *Library, raws: std.StringHashMapUnmanaged([]const u8) };
+pub const SyncResult = struct { lib: *Library, raw_arena: std.heap.ArenaAllocator, raws: std.StringHashMapUnmanaged([]const u8) };
 
 /// pages through search3 with an empty query (navidrome returns every song).
-/// `raws` and the library share the caller-visible lifetime of `lib.arena`.
+/// raw json lives in `raw_arena` only until it has been saved.
 pub fn sync(gpa: Allocator, sc: *subsonic.Client, now: i64) !SyncResult {
     const lib = try Library.create(gpa);
     errdefer lib.destroy(gpa);
     const a = lib.arena.allocator();
     var list: std.ArrayList(Song) = .empty;
+    var raw_arena: std.heap.ArenaAllocator = .init(gpa);
+    errdefer raw_arena.deinit();
+    const ra = raw_arena.allocator();
     var raws: std.StringHashMapUnmanaged([]const u8) = .empty;
     var offset: usize = 0;
     const page = 500;
@@ -477,8 +481,8 @@ pub fn sync(gpa: Allocator, sc: *subsonic.Client, now: i64) !SyncResult {
             if (item != .object) continue;
             const song = (try songFromJson(a, item.object)) orelse continue;
             try list.append(a, song);
-            const raw = try json.Stringify.valueAlloc(a, item, .{});
-            try raws.put(a, song.sid, raw);
+            const raw = try json.Stringify.valueAlloc(ra, item, .{});
+            try raws.put(ra, song.sid, raw);
         }
         log.debug("synced {d} songs", .{list.items.len});
         if (arr.array.items.len < page) break;
@@ -486,5 +490,5 @@ pub fn sync(gpa: Allocator, sc: *subsonic.Client, now: i64) !SyncResult {
     }
     lib.updated = now;
     try lib.finish(list.items);
-    return .{ .lib = lib, .raws = raws };
+    return .{ .lib = lib, .raw_arena = raw_arena, .raws = raws };
 }

@@ -12,6 +12,7 @@ pub const Client = struct {
     io: Io,
     http: std.http.Client,
     base: []const u8 = "",
+    reachable: bool = false,
     user: []const u8,
     pass: []const u8,
     last_req: Io.Timestamp = .zero,
@@ -29,9 +30,11 @@ pub const Client = struct {
             defer arena.deinit();
             if (c.call(arena.allocator(), "ping.view", &.{})) |_| {
                 log.info("using {s}", .{c.base});
+                c.reachable = true;
                 return;
             } else |err| log.warn("{s} not usable: {s}", .{ u, @errorName(err) });
         }
+        c.base = std.mem.trimEnd(u8, urls[0], "/");
         return error.Unreachable;
     }
 
