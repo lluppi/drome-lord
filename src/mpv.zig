@@ -27,6 +27,8 @@ pub const Mpv = struct {
     gpa: Allocator,
     io: Io,
     sock_path: []const u8,
+    /// pipewire node name, unique per instance so a visualizer never records another daemon's mpv
+    client_name: []const u8,
     extra_args: []const []const u8,
     volume: i32,
     ctx: *anyopaque,
@@ -35,6 +37,8 @@ pub const Mpv = struct {
     available: std.atomic.Value(bool) = .init(true),
     stopping: std.atomic.Value(bool) = .init(false),
     wmu: Io.Mutex = .init,
+    /// bumped on every (re)connect so the visualizer re-targets the new pipewire node
+    generation: std.atomic.Value(u32) = .init(0),
 
     pub fn start(m: *Mpv) !void {
         const t = try std.Thread.spawn(.{}, run, .{m});
@@ -84,6 +88,7 @@ pub const Mpv = struct {
         defer arena.deinit();
         const a = arena.allocator();
         try argv.appendSlice(m.gpa, &.{ "mpv", "--idle=yes", "--no-video", "--no-terminal" });
+        try argv.append(m.gpa, try std.fmt.allocPrint(a, "--audio-client-name={s}", .{m.client_name}));
         try argv.append(m.gpa, try std.fmt.allocPrint(a, "--input-ipc-server={s}", .{m.sock_path}));
         try argv.append(m.gpa, try std.fmt.allocPrint(a, "--volume={d}", .{m.volume}));
         try argv.appendSlice(m.gpa, m.extra_args);
@@ -113,6 +118,7 @@ pub const Mpv = struct {
             m.handler(m.ctx, .disconnected);
         }
         m.fd.store(fd, .release);
+        _ = m.generation.fetchAdd(1, .acq_rel);
         try m.send(.{ "observe_property", 1, "time-pos" });
         try m.send(.{ "observe_property", 2, "duration" });
         try m.send(.{ "observe_property", 3, "volume" });

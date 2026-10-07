@@ -183,7 +183,18 @@ pub fn execute(cx: *Cx) Error!void {
         .outputs => try cmdOutputs(cx),
         .enableoutput, .disableoutput, .toggleoutput => {
             try cx.need(1, 1);
-            if ((try cx.uint(0)) != 0) return cx.fail(.no_exist, "No such audio output", .{});
+            const id = try cx.uint(0);
+            if (id == 1 and cx.app.viz != null) {
+                const v = cx.app.viz.?;
+                v.setEnabled(switch (cmd) {
+                    .enableoutput => true,
+                    .disableoutput => false,
+                    else => !v.enabled.load(.acquire),
+                });
+                cx.app.hub.notify(Sub.output.bit());
+                return;
+            }
+            if (id != 0) return cx.fail(.no_exist, "No such audio output", .{});
             const p = cx.app.player;
             p.lock();
             defer p.unlock();
@@ -835,4 +846,5 @@ fn cmdOutputs(cx: *Cx) Error!void {
     cx.app.player.lock();
     defer cx.app.player.unlock();
     try cx.w.print("outputid: 0\noutputname: mpv\nplugin: mpv\noutputenabled: {d}\n", .{@intFromBool(cx.app.player.output_enabled)});
+    if (cx.app.viz) |v| try cx.w.print("outputid: 1\noutputname: visualizer\nplugin: pipewire\noutputenabled: {d}\n", .{@intFromBool(v.enabled.load(.acquire))});
 }

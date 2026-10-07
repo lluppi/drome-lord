@@ -8,6 +8,8 @@ pub const Config = struct {
     port: u16 = 6600,
     mpv_args: []const []const u8 = &.{},
     scrobble: bool = true,
+    /// udp host:port for ncmpcpp's visualizer; empty = off
+    visualizer: []const u8 = "",
     username: []const u8 = "",
     password: []const u8 = "",
     cache_dir: []const u8 = "",
@@ -71,6 +73,7 @@ pub fn load(arena: Allocator, io: Io, env: *const std.process.Environ.Map, opts:
             if (std.mem.eql(u8, p.key, "bind")) cfg.bind = p.value;
             if (std.mem.eql(u8, p.key, "port")) cfg.port = try std.fmt.parseInt(u16, p.value, 10);
             if (std.mem.eql(u8, p.key, "mpv_args")) cfg.mpv_args = try splitList(arena, p.value, ' ');
+            if (std.mem.eql(u8, p.key, "visualizer")) cfg.visualizer = p.value;
             if (std.mem.eql(u8, p.key, "scrobble")) cfg.scrobble = std.mem.eql(u8, p.value, "true");
         }
     } else std.log.warn("no config at {s}, using defaults", .{cfg_path});

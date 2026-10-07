@@ -22,6 +22,7 @@ pub const App = struct {
     store: db.Store,
     hub: hub_mod.Hub,
     player: *player_mod.Player,
+    viz: ?*@import("visualizer.zig").Visualizer = null,
     lib_mu: Io.Mutex = .init,
     lib: *db.Library,
     update_job: std.atomic.Value(u32) = .init(0),

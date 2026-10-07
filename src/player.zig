@@ -71,6 +71,7 @@ pub const Player = struct {
         hub: *hub_mod.Hub,
         sc: *subsonic.Client,
         sock_path: []const u8,
+        client_name: []const u8,
         mpv_args: []const []const u8,
         scrobble: bool,
     ) !*Player {
@@ -93,6 +94,7 @@ pub const Player = struct {
                 .gpa = gpa,
                 .io = io,
                 .sock_path = sock_path,
+                .client_name = client_name,
                 .extra_args = mpv_args,
                 .volume = vol,
                 .ctx = p,
