@@ -140,7 +140,13 @@ pub fn run(cx: *Cx, name: []const u8) Error!void {
         defer cx.app.unlockLib();
         try addToPlaylist(cx, a[0], try cmds.songsAt(cx, lib, a[1]));
     } else if (eq(u8, name, "playlistclear")) {
-        _ = try call(cx, "createPlaylist.view", &.{.{ "playlistId", pl.id }});
+        // createPlaylist with no songs does not empty it, so remove by index
+        const n = (try entries(cx, pl.id)).len;
+        if (n == 0) return;
+        var p: Params = .empty;
+        try p.append(cx.arena, .{ "playlistId", pl.id });
+        for (0..n) |i| try p.append(cx.arena, .{ "songIndexToRemove", try std.fmt.allocPrint(cx.arena, "{d}", .{i}) });
+        _ = try call(cx, "updatePlaylist.view", p.items);
         done(cx);
     } else if (eq(u8, name, "playlistdelete")) {
         if (a.len != 2) return cx.fail(.arg, "wrong number of arguments", .{});
