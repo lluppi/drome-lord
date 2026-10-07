@@ -9,14 +9,33 @@ extern fn stbi_image_free(p: ?*anyopaque) void;
 
 const log = std.log.scoped(.cover);
 
-// row diacritics from kitty's rowcolumn-diacritics table (first entries; enough for 66 rows)
+// row/column diacritics: all 297 entries of kitty's gen/rowcolumn-diacritics.txt
 const diacritics = [_]u21{
     0x0305, 0x030D, 0x030E, 0x0310, 0x0312, 0x033D, 0x033E, 0x033F, 0x0346, 0x034A, 0x034B, 0x034C,
     0x0350, 0x0351, 0x0352, 0x0357, 0x035B, 0x0363, 0x0364, 0x0365, 0x0366, 0x0367, 0x0368, 0x0369,
     0x036A, 0x036B, 0x036C, 0x036D, 0x036E, 0x036F, 0x0483, 0x0484, 0x0485, 0x0486, 0x0487, 0x0592,
     0x0593, 0x0594, 0x0595, 0x0597, 0x0598, 0x0599, 0x059C, 0x059D, 0x059E, 0x059F, 0x05A0, 0x05A1,
     0x05A8, 0x05A9, 0x05AB, 0x05AC, 0x05AF, 0x05C4, 0x0610, 0x0611, 0x0612, 0x0613, 0x0614, 0x0615,
-    0x0616, 0x0617, 0x0657, 0x0658, 0x0659, 0x065A, 0x065B, 0x065D, 0x065E,
+    0x0616, 0x0617, 0x0657, 0x0658, 0x0659, 0x065A, 0x065B, 0x065D, 0x065E, 0x06D6, 0x06D7, 0x06D8,
+    0x06D9, 0x06DA, 0x06DB, 0x06DC, 0x06DF, 0x06E0, 0x06E1, 0x06E2, 0x06E4, 0x06E7, 0x06E8, 0x06EB,
+    0x06EC, 0x0730, 0x0732, 0x0733, 0x0735, 0x0736, 0x073A, 0x073D, 0x073F, 0x0740, 0x0741, 0x0743,
+    0x0745, 0x0747, 0x0749, 0x074A, 0x07EB, 0x07EC, 0x07ED, 0x07EE, 0x07EF, 0x07F0, 0x07F1, 0x07F3,
+    0x0816, 0x0817, 0x0818, 0x0819, 0x081B, 0x081C, 0x081D, 0x081E, 0x081F, 0x0820, 0x0821, 0x0822,
+    0x0823, 0x0825, 0x0826, 0x0827, 0x0829, 0x082A, 0x082B, 0x082C, 0x082D, 0x0951, 0x0953, 0x0954,
+    0x0F82, 0x0F83, 0x0F86, 0x0F87, 0x135D, 0x135E, 0x135F, 0x17DD, 0x193A, 0x1A17, 0x1A75, 0x1A76,
+    0x1A77, 0x1A78, 0x1A79, 0x1A7A, 0x1A7B, 0x1A7C, 0x1B6B, 0x1B6D, 0x1B6E, 0x1B6F, 0x1B70, 0x1B71,
+    0x1B72, 0x1B73, 0x1CD0, 0x1CD1, 0x1CD2, 0x1CDA, 0x1CDB, 0x1CE0, 0x1DC0, 0x1DC1, 0x1DC3, 0x1DC4,
+    0x1DC5, 0x1DC6, 0x1DC7, 0x1DC8, 0x1DC9, 0x1DCB, 0x1DCC, 0x1DD1, 0x1DD2, 0x1DD3, 0x1DD4, 0x1DD5,
+    0x1DD6, 0x1DD7, 0x1DD8, 0x1DD9, 0x1DDA, 0x1DDB, 0x1DDC, 0x1DDD, 0x1DDE, 0x1DDF, 0x1DE0, 0x1DE1,
+    0x1DE2, 0x1DE3, 0x1DE4, 0x1DE5, 0x1DE6, 0x1DFE, 0x20D0, 0x20D1, 0x20D4, 0x20D5, 0x20D6, 0x20D7,
+    0x20DB, 0x20DC, 0x20E1, 0x20E7, 0x20E9, 0x20F0, 0x2CEF, 0x2CF0, 0x2CF1, 0x2DE0, 0x2DE1, 0x2DE2,
+    0x2DE3, 0x2DE4, 0x2DE5, 0x2DE6, 0x2DE7, 0x2DE8, 0x2DE9, 0x2DEA, 0x2DEB, 0x2DEC, 0x2DED, 0x2DEE,
+    0x2DEF, 0x2DF0, 0x2DF1, 0x2DF2, 0x2DF3, 0x2DF4, 0x2DF5, 0x2DF6, 0x2DF7, 0x2DF8, 0x2DF9, 0x2DFA,
+    0x2DFB, 0x2DFC, 0x2DFD, 0x2DFE, 0x2DFF, 0xA66F, 0xA67C, 0xA67D, 0xA6F0, 0xA6F1, 0xA8E0, 0xA8E1,
+    0xA8E2, 0xA8E3, 0xA8E4, 0xA8E5, 0xA8E6, 0xA8E7, 0xA8E8, 0xA8E9, 0xA8EA, 0xA8EB, 0xA8EC, 0xA8ED,
+    0xA8EE, 0xA8EF, 0xA8F0, 0xA8F1, 0xAAB0, 0xAAB2, 0xAAB3, 0xAAB7, 0xAAB8, 0xAABE, 0xAABF, 0xAAC1,
+    0xFE20, 0xFE21, 0xFE22, 0xFE23, 0xFE24, 0xFE25, 0xFE26, 0x10A0F, 0x10A38, 0x1D185, 0x1D186, 0x1D187,
+    0x1D188, 0x1D189, 0x1D1AA, 0x1D1AB, 0x1D1AC, 0x1D1AD, 0x1D242, 0x1D243, 0x1D244,
 };
 const placeholder: u21 = 0x10EEEE;
 
@@ -216,13 +235,15 @@ const Term = struct {
     id: u32,
 };
 
-const Opts = struct { text: bool = true, image: bool = true };
+const Layout = enum { auto, horizontal, vertical };
+const Opts = struct { text: bool = true, image: bool = true, layout: Layout = .auto };
 
 // kanagawa wave
 const fuji_white = "\x1b[38;2;220;215;186m";
 const carp_yellow = "\x1b[38;2;230;195;132m";
 const crystal_blue = "\x1b[38;2;126;156;216m";
 const fuji_gray = "\x1b[38;2;114;113;105m";
+const sumi_ink4 = "\x1b[38;2;84;84;109m";
 const spring_green = "\x1b[38;2;152;187;108m";
 const reset = "\x1b[0m";
 
@@ -235,7 +256,7 @@ const icon_random = "\u{F049D}";
 const icon_consume = "\u{F01B4}";
 const icon_volume = "\u{F057E}";
 
-const text_rows: usize = 5;
+
 
 fn termSize(t: *Term) void {
     var ws: std.posix.winsize = undefined;
@@ -303,57 +324,86 @@ fn flag(f: *std.ArrayList(u8), a: Allocator, on: bool, icon: []const u8) !void {
     try f.append(a, ' ');
 }
 
-/// the 5-line now-playing block starting at `row0`; lines are cleared and rewritten in place.
-fn drawText(f: *std.ArrayList(u8), a: Allocator, t: *const Term, row0: usize, song: ?Song, st: Status, waiting: []const u8) !void {
-    const cols = t.cols;
-    var lines: [text_rows]std.ArrayList(u8) = @splat(.empty);
+/// where the text block goes and how it is shaped.
+const TextPos = struct { row: usize = 1, col: usize = 1, width: usize = 80, horizontal: bool = false };
+
+fn textLines(horizontal: bool) usize {
+    return if (horizontal) 6 else 5;
+}
+
+/// progress bar + " 1:23 / 3:45", `width` columns in total.
+fn progress(f: *std.ArrayList(u8), a: Allocator, width: usize, st: Status) !void {
+    const label = try std.fmt.allocPrint(a, " {s} / {s}", .{ try clock(a, st.elapsed), try clock(a, st.duration) });
+    const lw = cpCount(label);
+    if (width <= lw + 4) return f.appendSlice(a, label[0..@min(label.len, width)]);
+    const bw = width - lw;
+    var filled: usize = 0;
+    if (st.state != .stop and st.duration > 0) {
+        const frac = std.math.clamp(st.elapsed / st.duration, 0.0, 1.0);
+        filled = @intFromFloat(@round(frac * @as(f64, @floatFromInt(bw))));
+    }
+    try f.appendSlice(a, carp_yellow);
+    if (filled > 0) {
+        for (0..filled - 1) |_| try f.appendSlice(a, "\u{2500}");
+        try f.appendSlice(a, "\u{257C}");
+    }
+    try f.appendSlice(a, sumi_ink4);
+    for (0..bw - filled) |_| try f.appendSlice(a, "\u{2500}");
+    if (st.state == .stop) {
+        try f.appendSlice(a, reset);
+        return;
+    }
+    try f.print(a, "{s} {s} {s}/ {s}{s}", .{ carp_yellow, try clock(a, st.elapsed), fuji_gray, try clock(a, st.duration), reset });
+}
+
+/// the now-playing block at `pos`; each line is cleared to its right edge and rewritten in place.
+fn drawText(f: *std.ArrayList(u8), a: Allocator, t: *const Term, pos: TextPos, song: ?Song, st: Status, waiting: []const u8) !void {
+    const w = pos.width;
+    const n = textLines(pos.horizontal);
+    var lines: [6]std.ArrayList(u8) = @splat(.empty);
     const icon = switch (st.state) {
         .play => icon_play,
         .pause => icon_pause,
         .stop => icon_stop,
     };
-    // 1: state icon + title
-    try lines[0].print(a, "{s}{s} {s}\x1b[1m{s}{s}", .{ carp_yellow, icon, fuji_white, try fit(a, if (song) |s| (if (s.title.len > 0) s.title else s.file) else waiting, cols -| 2), reset });
+    // title: state icon + title
+    try lines[0].print(a, "{s}{s} {s}\x1b[1m{s}{s}", .{ carp_yellow, icon, fuji_white, try fit(a, if (song) |s| (if (s.title.len > 0) s.title else s.file) else waiting, w -| 2), reset });
+    const bar_line: usize = if (pos.horizontal) 4 else 3;
     if (song) |s| {
-        // 2: artist
-        try lines[1].print(a, "{s}{s}{s}", .{ crystal_blue, try fit(a, if (s.artist.len > 0) s.artist else s.albumartist, cols), reset });
-        // 3: album · year
+        try lines[1].print(a, "{s}{s}{s}", .{ crystal_blue, try fit(a, if (s.artist.len > 0) s.artist else s.albumartist, w), reset });
         const al = if (s.date.len >= 4) try std.fmt.allocPrint(a, "{s} \u{B7} {s}", .{ s.album, s.date[0..4] }) else s.album;
-        try lines[2].print(a, "{s}{s}{s}", .{ fuji_gray, try fit(a, al, cols), reset });
-        // 4: elapsed / duration
-        if (st.state != .stop) {
-            try lines[3].print(a, "{s}{s}{s} / {s}{s}", .{ carp_yellow, try clock(a, st.elapsed), fuji_gray, try clock(a, st.duration), reset });
-        }
+        try lines[2].print(a, "{s}{s}{s}", .{ fuji_gray, try fit(a, al, w), reset });
     }
-    // 5: flags + volume
-    try flag(&lines[4], a, st.repeat, icon_repeat);
-    try flag(&lines[4], a, st.single, icon_single);
-    try flag(&lines[4], a, st.random, icon_random);
-    try flag(&lines[4], a, st.consume, icon_consume);
-    if (st.volume >= 0) try lines[4].print(a, " {s}{s} {d}%", .{ spring_green, icon_volume, st.volume });
-    try lines[4].appendSlice(a, reset);
-    for (lines, 0..) |l, i| {
-        if (row0 + i > t.rows) break;
-        try f.print(a, "\x1b[{d};1H\x1b[2K{s}", .{ row0 + i, l.items });
+    try progress(&lines[bar_line], a, w, st);
+    const fl = &lines[n - 1];
+    try flag(fl, a, st.repeat, icon_repeat);
+    try flag(fl, a, st.single, icon_single);
+    try flag(fl, a, st.random, icon_random);
+    try flag(fl, a, st.consume, icon_consume);
+    if (st.volume >= 0) try fl.print(a, " {s}{s} {d}%", .{ spring_green, icon_volume, st.volume });
+    try fl.appendSlice(a, reset);
+    for (lines[0..n], 0..) |l, i| {
+        if (pos.row + i > t.rows) break;
+        try f.print(a, "\x1b[{d};{d}H\x1b[K{s}", .{ pos.row + i, pos.col, l.items });
     }
 }
 
-const Placed = struct { rows: usize };
+const Placed = struct { rows: usize, cols: usize };
 
-/// image fitted to the pane width (or height when taller than the room), centered, top aligned.
-fn drawImage(f: *std.ArrayList(u8), a: Allocator, t: *const Term, im: Image, room_rows: usize) !?Placed {
-    if (room_rows < 2) return null;
+/// image fitted into max_cols x max_rows cells keeping aspect, top-left at (1, col0 or centred).
+fn drawImage(f: *std.ArrayList(u8), a: Allocator, t: *const Term, im: Image, max_cols: usize, max_rows: usize, center: bool) !?Placed {
+    if (max_rows < 2 or max_cols < 2) return null;
     const aspect = @as(f64, @floatFromInt(im.w)) / @as(f64, @floatFromInt(im.h));
     const cw: f64 = @floatFromInt(t.cw);
     const ch: f64 = @floatFromInt(t.ch);
-    var wc: usize = t.cols;
+    var wc: usize = max_cols;
     var hc: usize = @intFromFloat(@round(@as(f64, @floatFromInt(wc)) * cw / aspect / ch));
-    if (hc > room_rows) {
-        hc = room_rows;
+    if (hc > max_rows) {
+        hc = max_rows;
         wc = @intFromFloat(@round(@as(f64, @floatFromInt(hc)) * ch * aspect / cw));
     }
-    wc = std.math.clamp(wc, 1, t.cols);
-    hc = std.math.clamp(hc, 1, room_rows);
+    wc = std.math.clamp(wc, 1, max_cols);
+    hc = std.math.clamp(hc, 1, max_rows);
     // pixel size matching the cell box, never above the source and capped at 640px
     const box_w: f64 = @floatFromInt(wc * t.cw);
     const box_h: f64 = @floatFromInt(hc * t.ch);
@@ -366,7 +416,7 @@ fn drawImage(f: *std.ArrayList(u8), a: Allocator, t: *const Term, im: Image, roo
     const b64 = try a.alloc(u8, std.base64.standard.Encoder.calcSize(px.len));
     _ = std.base64.standard.Encoder.encode(b64, px);
 
-    const col0 = (t.cols - wc) / 2 + 1;
+    const col0: usize = if (center) (t.cols - wc) / 2 + 1 else 1;
     if (!t.tmux) try f.print(a, "\x1b[1;{d}H", .{col0});
     const chunk = 4096;
     var off: usize = 0;
@@ -399,7 +449,7 @@ fn drawImage(f: *std.ArrayList(u8), a: Allocator, t: *const Term, im: Image, roo
             try f.appendSlice(a, "\x1b[39m");
         }
     }
-    return .{ .rows = hc };
+    return .{ .rows = hc, .cols = wc };
 }
 
 // ---- main loop
@@ -411,7 +461,7 @@ fn onSignal(sig: std.posix.SIG) callconv(.c) void {
     _ = std.c.write(sig_wr, &b, 1);
 }
 
-const usage = "usage: drome-lord cover [--host 127.0.0.1] [--port 6600] [--no-text] [--no-image] [--placeholders]\n";
+const usage = "usage: drome-lord cover [--host 127.0.0.1] [--port 6600] [--layout auto|horizontal|vertical] [--no-text] [--no-image] [--placeholders]\n";
 
 pub fn run(init: std.process.Init, args: *std.process.Args.Iterator) !void {
     const gpa = init.gpa;
@@ -422,7 +472,7 @@ pub fn run(init: std.process.Init, args: *std.process.Args.Iterator) !void {
     var dump_path: ?[]const u8 = null;
     var opts: Opts = .{};
     while (args.next()) |a| {
-        if (std.mem.eql(u8, a, "--host")) host = args.next() orelse return error.BadArgs else if (std.mem.eql(u8, a, "--port")) port = try std.fmt.parseInt(u16, args.next() orelse return error.BadArgs, 10) else if (std.mem.eql(u8, a, "--placeholders")) force_placeholders = true else if (std.mem.eql(u8, a, "--no-text")) opts.text = false else if (std.mem.eql(u8, a, "--no-image")) opts.image = false else if (std.mem.eql(u8, a, "--dump")) dump_path = args.next() else {
+        if (std.mem.eql(u8, a, "--host")) host = args.next() orelse return error.BadArgs else if (std.mem.eql(u8, a, "--port")) port = try std.fmt.parseInt(u16, args.next() orelse return error.BadArgs, 10) else if (std.mem.eql(u8, a, "--placeholders")) force_placeholders = true else if (std.mem.eql(u8, a, "--layout")) opts.layout = std.meta.stringToEnum(Layout, args.next() orelse "") orelse return error.BadArgs else if (std.mem.eql(u8, a, "--no-text")) opts.text = false else if (std.mem.eql(u8, a, "--no-image")) opts.image = false else if (std.mem.eql(u8, a, "--dump")) dump_path = args.next() else {
             std.debug.print(usage, .{});
             return;
         }
@@ -468,11 +518,13 @@ pub fn run(init: std.process.Init, args: *std.process.Args.Iterator) !void {
     defer if (dump) |d| d.close(io);
 
     var conn: ?*Conn = null;
+    defer dropConn(gpa, &conn);
     var drawn_key: []u8 = &.{};
+    defer gpa.free(drawn_key);
     var drawn_rows: usize = 0;
     var drawn_cols: usize = 0;
     var drawn_had_song = false;
-    var text_row0: usize = 1;
+    var text_pos: TextPos = .{};
     var need_full = true;
     var image: ?Image = null;
     var image_arena: std.heap.ArenaAllocator = .init(gpa);
@@ -540,19 +592,37 @@ pub fn run(init: std.process.Init, args: *std.process.Args.Iterator) !void {
         if (need_full) {
             try f.appendSlice(fa, "\x1b[2J\x1b[H");
             try apc(&f, fa, &term, try std.fmt.allocPrint(fa, "a=d,d=I,i={d},q=2", .{term.id}), "");
-            var used: usize = 0;
-            if (opts.image and song != null) if (image) |im| {
-                const room = term.rows -| (if (opts.text) text_rows else 0);
-                if (try drawImage(&f, fa, &term, im, room)) |p| used = p.rows;
+            const horizontal = switch (opts.layout) {
+                .horizontal => true,
+                .vertical => false,
+                .auto => term.cols >= term.rows * 4,
             };
-            text_row0 = if (used > 0) used + 1 else 1;
-            if (!opts.text) text_row0 = term.rows + 1;
+            var placed: ?Placed = null;
+            if (opts.image and song != null) if (image) |im| {
+                if (!opts.text) {
+                    placed = try drawImage(&f, fa, &term, im, term.cols, term.rows, true);
+                } else if (horizontal) {
+                    placed = try drawImage(&f, fa, &term, im, term.cols -| 24, term.rows, false);
+                } else {
+                    placed = try drawImage(&f, fa, &term, im, term.cols, term.rows -| textLines(false), true);
+                }
+            };
+            const n = textLines(horizontal);
+            text_pos = .{ .horizontal = horizontal, .row = 1, .col = 1, .width = term.cols };
+            if (horizontal) {
+                const x = if (placed) |p| p.cols + 2 else 0;
+                text_pos.col = x + 1;
+                text_pos.width = term.cols -| x;
+                text_pos.row = if (term.rows > n) (term.rows - n) / 2 + 1 else 1;
+            } else if (placed) |p| {
+                text_pos.row = p.rows + 1;
+            }
             drawn_rows = term.rows;
             drawn_cols = term.cols;
             need_full = false;
         }
         drawn_had_song = song != null;
-        if (opts.text) try drawText(&f, fa, &term, text_row0, song, status, waiting);
+        if (opts.text) try drawText(&f, fa, &term, text_pos, song, status, waiting);
         if (dump) |d| {
             var wbuf: [4096]u8 = undefined;
             var w = d.writerStreaming(io, &wbuf);
