@@ -46,7 +46,7 @@ fn portInUse(io: Io, cfg: config.Config) bool {
     return true;
 }
 
-const usage = "usage: drome-lord [--config path] [--verbose]\n";
+const usage = "usage: drome-lord [--config path] [--verbose]\n       drome-lord cover [--host 127.0.0.1] [--port 6600]\n";
 
 pub fn main(init: std.process.Init) !void {
     const gpa = init.gpa;
@@ -56,6 +56,14 @@ pub fn main(init: std.process.Init) !void {
     var opts: config.Options = .{};
     var args = init.minimal.args.iterate();
     _ = args.next();
+    {
+        var peek = init.minimal.args.iterate();
+        _ = peek.next();
+        if (peek.next()) |sub| if (std.mem.eql(u8, sub, "cover")) {
+            _ = args.next();
+            return @import("cover.zig").run(init, &args);
+        };
+    }
     while (args.next()) |a| {
         if (std.mem.eql(u8, a, "--verbose") or std.mem.eql(u8, a, "-v")) {
             opts.verbose = true;

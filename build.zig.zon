@@ -8,6 +8,10 @@
             .url = "https://sqlite.org/2025/sqlite-amalgamation-3500400.zip",
             .hash = "N-V-__8AAHCbqABM_X5RTjbDBDBWErxZE8tJzmtEnLOLRHGx",
         },
+        .stb = .{
+            .url = "https://github.com/nothings/stb/archive/2c980bb59875b0d32144a71867fbdebb2f77cd20.tar.gz",
+            .hash = "N-V-__8AAPJDTgBMvhz_RoGlqYS1cMahRQ6Q5GVqYKny36gQ",
+        },
     },
     .paths = .{ "build.zig", "build.zig.zon", "src", "README.md", "SPEC.md" },
 }

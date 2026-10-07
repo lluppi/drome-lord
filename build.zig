@@ -26,6 +26,10 @@ pub fn build(b: *std.Build) void {
         }),
     });
     exe.root_module.addIncludePath(sqlite_dep.path("."));
+    // stb_image decodes cover art for `drome-lord cover`
+    const stb_dep = b.dependency("stb", .{});
+    exe.root_module.addIncludePath(stb_dep.path("."));
+    exe.root_module.addCSourceFile(.{ .file = b.path("src/stb_impl.c"), .flags = &.{} });
     exe.root_module.linkLibrary(sqlite);
     b.installArtifact(exe);
 
