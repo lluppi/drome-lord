@@ -454,6 +454,7 @@ pub const SyncResult = struct { lib: *Library, raw_arena: std.heap.ArenaAllocato
 /// pages through search3 with an empty query (navidrome returns every song).
 /// raw json lives in `raw_arena` only until it has been saved.
 pub fn sync(gpa: Allocator, sc: *subsonic.Client, now: i64) !SyncResult {
+    subsonic.timeout_ms = 30_000; // sync thread only: pages are big
     const lib = try Library.create(gpa);
     errdefer lib.destroy(gpa);
     const a = lib.arena.allocator();

@@ -5,7 +5,31 @@ const json = std.json;
 
 const log = std.log.scoped(.subsonic);
 
-pub const Error = error{ WriteFailed, HttpStatus, ApiError, BadResponse, Unreachable } || Allocator.Error;
+pub const Error = error{ Timeout, WriteFailed, HttpStatus, ApiError, BadResponse, Unreachable } || Allocator.Error;
+
+/// per-thread deadline for one http request (connect + response); the sync thread raises it.
+pub threadlocal var timeout_ms: u32 = 10_000;
+
+const Fetched = struct { status: std.http.Status, body: ?[]u8, err: ?anyerror };
+
+fn fetchTask(http: *std.http.Client, alloc: Allocator, u: []const u8) Fetched {
+    var aw: Io.Writer.Allocating = .init(alloc);
+    const res = http.fetch(.{
+        .location = .{ .url = u },
+        .response_writer = &aw.writer,
+        .keep_alive = false, // a pooled connection that went stale would hang until the deadline
+    }) catch |err| {
+        aw.deinit();
+        return .{ .status = .internal_server_error, .body = null, .err = err };
+    };
+    const body = aw.toOwnedSlice() catch {
+        aw.deinit();
+        return .{ .status = res.status, .body = null, .err = error.OutOfMemory };
+    };
+    return .{ .status = res.status, .body = body, .err = null };
+}
+
+const Race = union(enum) { fetch: Fetched, timer: Io.Cancelable!void };
 
 pub const Client = struct {
     gpa: Allocator,
@@ -24,6 +48,9 @@ pub const Client = struct {
 
     /// first url that answers ping.view wins.
     pub fn pickUrl(c: *Client, urls: []const []const u8) !void {
+        const saved = timeout_ms;
+        timeout_ms = 4_000;
+        defer timeout_ms = saved;
         for (urls) |u| {
             c.base = std.mem.trimEnd(u8, u, "/");
             var arena: std.heap.ArenaAllocator = .init(c.gpa);
@@ -82,6 +109,38 @@ pub const Client = struct {
         c.last_req = Io.Timestamp.now(c.io, .awake);
     }
 
+    /// runs the request against a deadline; cancelling the loser interrupts its blocking io.
+    fn timedFetch(c: *Client, alloc: Allocator, u: []const u8, endpoint: []const u8) Error!Fetched {
+        var buf: [2]Race = undefined;
+        var sel: Io.Select(Race) = .init(c.io, &buf);
+        sel.concurrent(.fetch, fetchTask, .{ &c.http, alloc, u }) catch {
+            // no spare thread for the watchdog: plain request, no deadline
+            const r = fetchTask(&c.http, alloc, u);
+            if (r.err != null) return error.Unreachable;
+            return r;
+        };
+        sel.concurrent(.timer, Io.sleep, .{ c.io, Io.Duration.fromMilliseconds(timeout_ms), Io.Clock.awake }) catch {};
+        const first = sel.await() catch return error.Timeout;
+        const other = sel.cancel();
+        if (other) |o| switch (o) {
+            .fetch => |f| if (f.body) |b| alloc.free(b),
+            .timer => {},
+        };
+        switch (first) {
+            .timer => {
+                log.warn("{s}: timed out after {d}ms", .{ endpoint, timeout_ms });
+                return error.Timeout;
+            },
+            .fetch => |f| {
+                if (f.err) |err| {
+                    log.debug("{s}: {s}", .{ endpoint, @errorName(err) });
+                    return error.Unreachable;
+                }
+                return f;
+            },
+        }
+    }
+
     /// raw body of a request; handles 429 with backoff. never logs the url.
     pub fn getBytes(c: *Client, alloc: Allocator, endpoint: []const u8, params: []const [2][]const u8) Error![]u8 {
         var tries: u32 = 0;
@@ -89,17 +148,10 @@ pub const Client = struct {
             c.throttle();
             const u = try c.url(alloc, endpoint, params);
             defer alloc.free(u);
-            var aw: Io.Writer.Allocating = .init(alloc);
-            errdefer aw.deinit();
-            const res = c.http.fetch(.{
-                .location = .{ .url = u },
-                .response_writer = &aw.writer,
-            }) catch |err| {
-                log.debug("{s}: {s}", .{ endpoint, @errorName(err) });
-                return error.Unreachable;
-            };
+            const res = try c.timedFetch(alloc, u, endpoint);
+            errdefer if (res.body) |b| alloc.free(b);
             if (res.status == .too_many_requests and tries < 6) {
-                aw.deinit();
+                alloc.free(res.body.?);
                 log.warn("429 from server, backing off", .{});
                 c.io.sleep(.fromSeconds(1 + tries), .awake) catch {};
                 continue;
@@ -108,7 +160,7 @@ pub const Client = struct {
                 log.warn("{s}: http {d}", .{ endpoint, @intFromEnum(res.status) });
                 return error.HttpStatus;
             }
-            return aw.toOwnedSlice();
+            return res.body.?;
         }
     }
 
