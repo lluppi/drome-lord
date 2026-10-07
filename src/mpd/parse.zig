@@ -250,6 +250,10 @@ pub fn parseQuery(arena: Allocator, args: []const []const u8, search: bool) !Que
             if (i + 1 >= args.len) return error.BadFilter;
             try groups.append(arena, db.Tag.parse(args[i + 1]) orelse return error.BadFilter);
             i += 2;
+        } else if (std.ascii.eqlIgnoreCase(a, "base")) {
+            if (i + 1 >= args.len) return error.BadFilter;
+            try parts.append(arena, .{ .cmp = .{ .field = .base, .op = .eq, .value = args[i + 1] } });
+            i += 2;
         } else {
             if (i + 1 >= args.len) return error.BadFilter;
             const f = Parser.field(a) orelse return error.BadFilter;
