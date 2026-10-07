@@ -1,0 +1,13 @@
+.{
+    .name = .drome_lord,
+    .fingerprint = 0x81ae047d3d2a4480,
+    .version = "0.1.0",
+    .minimum_zig_version = "0.17.0",
+    .dependencies = .{
+        .sqlite = .{
+            .url = "https://sqlite.org/2025/sqlite-amalgamation-3500400.zip",
+            .hash = "N-V-__8AAHCbqABM_X5RTjbDBDBWErxZE8tJzmtEnLOLRHGx",
+        },
+    },
+    .paths = .{ "build.zig", "build.zig.zon", "src", "README.md", "SPEC.md" },
+}
