@@ -31,7 +31,25 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addIncludePath(stb_dep.path("."));
     exe.root_module.addCSourceFile(.{ .file = b.path("src/stb_impl.c"), .flags = &.{} });
     exe.root_module.linkLibrary(sqlite);
-    b.installArtifact(exe);
+    // macos visualizer: core audio process tap (`drome-lord tap <pid>`, see src/tap.m)
+    if (target.result.os.tag == .macos) {
+        exe.root_module.addCSourceFile(.{ .file = b.path("src/tap.m"), .flags = &.{ "-fobjc-arc", "-mmacosx-version-min=14.2" } });
+        exe.root_module.linkFramework("CoreAudio", .{});
+        exe.root_module.linkFramework("Foundation", .{});
+    }
+    // macos keys the system audio permission to the code signature: an ad-hoc one changes with every
+    // build (so every rebuild asks again), a real identity keeps the grant. re-signing also binds the
+    // embedded Info.plist from tap.m.
+    if (target.result.os.tag == .macos) {
+        const identity = b.option([]const u8, "codesign", "macos signing identity (default: ad-hoc, re-asks for audio permission after every rebuild)") orelse "-";
+        const sign = b.addSystemCommand(&.{ "sh", "-c", "cp \"$1\" \"$2\" && codesign --remove-signature \"$2\" && codesign --sign \"$3\" --identifier al.imre.drome-lord \"$2\"", "sign" });
+        sign.addFileArg(exe.getEmittedBin());
+        const signed = sign.addOutputFileArg("drome-lord");
+        sign.addArg(identity);
+        b.getInstallStep().dependOn(&b.addInstallBinFile(signed, "drome-lord").step);
+    } else {
+        b.installArtifact(exe);
+    }
 
     const run = b.addRunArtifact(exe);
     run.step.dependOn(b.getInstallStep());

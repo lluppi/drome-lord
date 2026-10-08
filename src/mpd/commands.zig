@@ -846,5 +846,5 @@ fn cmdOutputs(cx: *Cx) Error!void {
     cx.app.player.lock();
     defer cx.app.player.unlock();
     try cx.w.print("outputid: 0\noutputname: mpv\nplugin: mpv\noutputenabled: {d}\n", .{@intFromBool(cx.app.player.output_enabled)});
-    if (cx.app.viz) |v| try cx.w.print("outputid: 1\noutputname: visualizer\nplugin: pipewire\noutputenabled: {d}\n", .{@intFromBool(v.enabled.load(.acquire))});
+    if (cx.app.viz) |v| try cx.w.print("outputid: 1\noutputname: visualizer\nplugin: {s}\noutputenabled: {d}\n", .{ @import("../visualizer.zig").plugin, @intFromBool(v.enabled.load(.acquire)) });
 }

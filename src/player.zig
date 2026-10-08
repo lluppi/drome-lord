@@ -47,6 +47,10 @@ pub const Player = struct {
     mpv_duration: f64 = 0,
     mpv_bitrate: f64 = 0,
     mpv_next: ?u32 = null,
+    /// set between mpv's end-file (eof) and the start-file of the appended entry. in that gap mpv's
+    /// current entry is still the finished one, so a playlist-clear would drop the entry it's about
+    /// to play; syncNext waits for start-file instead.
+    switching: bool = false,
     rand_next: ?u32 = null,
     pending_seek: ?f64 = null,
     scrobbled: bool = false,
@@ -247,7 +251,7 @@ pub const Player = struct {
 
     /// keeps mpv's appended entry equal to peekNext() so track changes are gapless.
     pub fn syncNext(p: *Player) void {
-        if (p.state == .stop or !p.mpv.connected()) return;
+        if (p.state == .stop or !p.mpv.connected() or p.switching) return;
         const want = p.peekNext();
         if (want == p.mpv_next) return;
         p.mpvSend(.{"playlist-clear"});
@@ -286,6 +290,7 @@ pub const Player = struct {
         p.mpv_duration = 0;
         p.mpv_bitrate = 0;
         p.mpv_next = null;
+        p.switching = false;
         p.rand_next = null;
         p.scrobbled = false;
         p.pending_seek = null;
@@ -298,6 +303,7 @@ pub const Player = struct {
     pub fn stopPlayback(p: *Player, forget: bool) void {
         if (p.state != .stop) p.mpvSend(.{"stop"});
         p.state = .stop;
+        p.switching = false;
         p.mpv_next = null;
         p.elapsed = 0;
         p.pending_seek = null;
@@ -455,6 +461,7 @@ pub const Player = struct {
                 p.setError("mpv exited");
                 p.state = .stop;
                 p.mpv_next = null;
+                p.switching = false;
                 p.notify(.{.player});
             },
             .time_pos => |t| {
@@ -484,7 +491,11 @@ pub const Player = struct {
                 }
             },
             .bitrate => |b| p.mpv_bitrate = b,
-            .start_file, .idle => {},
+            .start_file => if (p.switching) {
+                p.switching = false;
+                p.syncNext();
+            },
+            .idle => {},
             .end_file => |why| p.onEndFile(why),
         }
     }
@@ -512,13 +523,13 @@ pub const Player = struct {
             p.cur = target;
             if (p.curEntry()) |e| e.played = true;
             p.mpv_next = null;
+            p.switching = true; // start-file of the appended entry runs syncNext
             p.rand_next = null;
             p.elapsed = 0;
             p.mpv_duration = 0;
             p.scrobbled = false;
             p.scrobbleSend(false);
             p.consumeEntry(old);
-            p.syncNext();
             p.notify(.{.player});
         } else p.moveOn(target, old);
     }

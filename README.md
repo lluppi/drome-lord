@@ -7,7 +7,7 @@ mpv. library gets cached in sqlite so browsing is instant. i needed this cause i
 
 - browsing (media library, browser, search), queue, stored playlists (= subsonic playlists)
 - gapless playback through mpv, idle, command lists, scrobbling
-- visualizer feed for ncmpcpp (linux/pipewire only)
+- visualizer feed for ncmpcpp (linux: pipewire, macos 14.2+: core audio process tap)
 - `drome-lord cover`: album art pane for kitty/ghostty, also inside tmux
 
 ## build
@@ -16,6 +16,16 @@ needs zig 0.17.0 and mpv. sqlite and stb_image are fetched by `zig build`.
 
 ```
 zig build -Doptimize=ReleaseSafe --prefix ~/.local
+```
+
+on macos the visualizer needs "system audio recording" permission (system settings > privacy &
+security > screen & system audio recording), asked for the first time it taps mpv. macos ties
+that grant to the code signature, and the default ad-hoc one changes every build, so pass a
+signing identity to keep the grant across rebuilds (a self-signed code signing cert trusted for code signing works;
+`security find-identity -p codesigning` lists them):
+
+```
+zig build -Doptimize=ReleaseSafe --prefix ~/.local -Dcodesign="my signing identity"
 ```
 
 ## config
@@ -104,7 +114,6 @@ launchd agent, `~/Library/LaunchAgents/local.drome-lord.plist`, then
 
 ## not done yet
 
-- visualizer on macos (no pipewire there)
 - real regexes in `=~` filters, `modified-since`
 - `addtagid`/`cleartagid`, fingerprints, crossfade/mixramp (stored but not applied)
 - cover pane is untested outside ghostty/kitty

@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const Io = std.Io;
 const config = @import("config.zig");
 const subsonic = @import("subsonic.zig");
@@ -46,7 +47,11 @@ fn portInUse(io: Io, cfg: config.Config) bool {
     return true;
 }
 
-const usage = "usage: drome-lord [--config path] [--verbose]\n       drome-lord cover [--host 127.0.0.1] [--port 6600]\n";
+const usage = "usage: drome-lord [--config path] [--verbose]\n       drome-lord cover [--host 127.0.0.1] [--port 6600]\n" ++
+    (if (builtin.os.tag == .macos) "       drome-lord tap <pid>   (macos: raw s16le 44.1k stereo of that process's audio on stdout)\n" else "");
+
+/// src/tap.m, macos only
+extern fn drome_tap(pid: c_int) c_int;
 
 pub fn main(init: std.process.Init) !void {
     const gpa = init.gpa;
@@ -62,6 +67,13 @@ pub fn main(init: std.process.Init) !void {
         if (peek.next()) |sub| if (std.mem.eql(u8, sub, "cover")) {
             _ = args.next();
             return @import("cover.zig").run(init, &args);
+        } else if (builtin.os.tag == .macos and std.mem.eql(u8, sub, "tap")) {
+            _ = args.next();
+            const pid = std.fmt.parseInt(c_int, args.next() orelse "", 10) catch {
+                std.debug.print(usage, .{});
+                std.process.exit(2);
+            };
+            std.process.exit(@intCast(drome_tap(pid)));
         };
     }
     while (args.next()) |a| {
