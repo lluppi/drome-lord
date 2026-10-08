@@ -76,6 +76,12 @@ pub const Visualizer = struct {
         v.n += 1;
     }
 
+    fn playing(v: *Visualizer) bool {
+        v.player.lock();
+        defer v.player.unlock();
+        return v.player.state == .play;
+    }
+
     fn wanted(v: *Visualizer) bool {
         if (!v.enabled.load(.acquire) or !v.player.mpv.connected()) return false;
         v.player.lock();
@@ -119,7 +125,12 @@ pub const Visualizer = struct {
         var child = try std.process.spawn(v.io, .{ .argv = argv, .stdin = .ignore, .stdout = .pipe, .stderr = .ignore });
         defer child.kill(v.io);
         const fd = child.stdout.?.handle;
-        var buf: [4096]u8 = undefined;
+        // ncmpcpp reads one datagram per frame (fps, ~1/s when not playing), so every datagram we
+        // send beyond that piles up in its socket buffer (~4s on macos) and the bars lag the music.
+        // batch into fixed ~46ms datagrams (~21/s, under any sane visualizer_fps, and under macos's
+        // 9216-byte udp limit); a multiple of 4 so stereo s16 frames stay aligned.
+        var buf: [8192]u8 = undefined;
+        var fill: usize = 0;
         while (true) {
             var fds = [_]std.c.pollfd{.{ .fd = fd, .events = std.c.POLL.IN, .revents = 0 }};
             const r = std.c.poll(&fds, 1, 300);
@@ -128,10 +139,16 @@ pub const Visualizer = struct {
                 continue;
             }
             if (r < 0) return;
-            const n = std.c.read(fd, &buf, buf.len);
+            const n = std.c.read(fd, buf[fill..].ptr, buf.len - fill);
             if (n <= 0) return;
             if (v.kick.load(.acquire) != kick or !v.enabled.load(.acquire)) return;
-            for (0..v.n) |i| v.socks[i].send(v.io, &v.dests[i], buf[0..@intCast(n)]) catch |err| log.debug("send {d}: {s}", .{ i, @errorName(err) });
+            fill += @intCast(n);
+            if (fill < buf.len) continue;
+            fill = 0;
+            // paused: the tap keeps delivering (silence), and ncmpcpp would drain any backlog at
+            // ~1 frame/s, so send nothing until playback resumes
+            if (!v.playing()) continue;
+            for (0..v.n) |i| v.socks[i].send(v.io, &v.dests[i], &buf) catch |err| log.debug("send {d}: {s}", .{ i, @errorName(err) });
         }
     }
 };
